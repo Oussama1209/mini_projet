@@ -1,6 +1,9 @@
 #ifndef MOTORS_LIB_H_
 #define MOTORS_LIB_H_
 
+struct Mypoint;
+
+void start_program(void);
 // Initialize right motor position to 0
 //IMPORTANT TO CALL BEFORE THE WHILE LOOP
 void init_position_motor(void);
@@ -26,6 +29,9 @@ void stop_motor(void);
 //sets the robot on a perpendicular line to the side that the user faced it towards
 void calibration_angle(int direction);
 
+//Mettre le robot perpendiculaire à un bord
+void perpendiculaire(void);
+
 //determine the y and x axis on the board
 void determine_x_y_axis(void);
 
@@ -43,8 +49,7 @@ void go_x(int x_i, int x_f);
 //moves the robot from one point to another
 void go_from_to(int x_i, int y_i, int x_f, int y_f);
 
-//est-ce que struct est bien d'implementer dans le projet?
-void go_through_points(void);
+
 
 #endif /* MOTORS_LIB_H  */
 

@@ -14,11 +14,17 @@
 #define WHEEL_DISTANCE      5.35f    //cm
 #define PERIMETER_EPUCK     (PI * WHEEL_DISTANCE)
 //Dimension de la planche
-#define distance_x				400		//largeur in mm
-#define	distance_y				400		//longueur in mm
+#define distance_x				200		//largeur in mm
+#define	distance_y				300		//longueur in mm
 #define SAMPLE_SIZE				5000	//number of samples used
 #define SIDES					4		//number of sides of the board
-#define POINTS					8		//number of points to determine on the board
+#define POINTS					2		//number of points to determine on the board
+
+#define MUR_DETECTER			0
+#define AUCUN_MUR				1
+#define SIZE_TAB				2		//taille du tableau
+#define TARAUDAGE				0
+#define PERCAGE					1
 
 static int avg_distance=0;
 static int distance_min=8000;
@@ -27,6 +33,19 @@ static int sides[SIDES];
 static int Points_X[POINTS];
 static int Points_Y[POINTS];
 
+static bool detection_mur = AUCUN_MUR;
+static uint8_t pos_tab = 0;
+static bool programme_fini = 1;
+
+//structure
+struct Mypoint {
+	uint16_t x; //coordonnée en x en mm
+	uint16_t y; //coordonnée en y en mm
+	uint8_t diametre; //diamètre en mm
+	uint8_t type; //type de trou : perçage = p, taraudage = t
+};
+
+static struct Mypoint tab_point[2] = {{10, 10, 2, TARAUDAGE}, {20, 20, 3, PERCAGE}};
 
 void init_position_motor(void){
 	right_motor_set_pos(0);
@@ -104,6 +123,7 @@ void calibration_angle(int direction){
 		for(int i=0;i<SAMPLE_SIZE;i++){
 			tab_angle[i] = VL53L0X_get_dist_mm();
 			wait(500);
+
 			avg_distance+=tab_angle[i];
 		}
 		avg_distance=avg_distance/SAMPLE_SIZE;
@@ -131,6 +151,30 @@ void calibration_angle(int direction){
 	//sets the values to their original ones for another calibration
 	distance_min=8000;
 	avg_distance=0;
+}
+
+void perpendiculaire(void){
+	static uint8_t position = 0;
+	static uint8_t good_position = 0;
+	for(int i=0 ;i < 200; i++){
+		//takes average of the vales of distance the TOF receives
+		for(int i=0;i<SAMPLE_SIZE;i++){
+			//chThdSleepMilliseconds(10);
+			wait(500);
+			avg_distance+=VL53L0X_get_dist_mm();
+		}
+		avg_distance=avg_distance/SAMPLE_SIZE;
+		chprintf((BaseSequentialStream *)&SD3, "Dist min =  %d\n", distance_min);
+		if(avg_distance < distance_min){
+			good_position = position;
+			distance_min = avg_distance;
+			chprintf((BaseSequentialStream *)&SD3, "goodpos =  %d\n", good_position);
+		}
+		//chprintf((BaseSequentialStream *)&SD3, "Oooooh");
+		nieme_turn(200,1);
+		position += 1;
+	}
+	nieme_turn(200/good_position, 1);
 }
 
 //determine the y and x axis on the board
@@ -234,12 +278,44 @@ void go_from_to(int x_i, int y_i, int x_f, int y_f){
 
 }
 
-//est-ce que struct est bien d'implementer dans le projet?
-void go_through_points(void){
-	for(int i=1;i<POINTS;i++){
-		go_from_to(Points_X[i-1],Points_Y[i-1],Points_X[i],Points_Y[i]);
+void detection_dun_mur(void){
+	if(VL53L0X_get_dist_mm() < 600) {
+		detection_mur = MUR_DETECTER;
 	}
 }
 
 
+static THD_WORKING_AREA(waMouvement, 256);
+static THD_FUNCTION(Mouvement, arg) {
+
+    chRegSetThreadName(__FUNCTION__);
+    (void)arg;
+
+    while(1){
+    	if(programme_fini){
+			//Regarde si on détecte un mur, si oui, on commence le programme
+			while(detection_mur){
+				detection_dun_mur();
+			}
+			//on le met perpendiculaire au mur
+			calibration_angle(-1);
+			chprintf((BaseSequentialStream *)&SD3, "HELLO");
+			//Déterminer axe des y le plus long
+			determine_x_y_axis();
+			//perpendiculaire();
+			placement_corner();
+			//aller de l'origine jusqu'au premier point
+			go_from_to(0,0,tab_point[0].x,tab_point[0].y);
+			while(pos_tab < SIZE_TAB){
+				go_from_to(tab_point[pos_tab].x, tab_point[pos_tab].y, tab_point[pos_tab+1].x, tab_point[pos_tab+1].y);
+			}
+			programme_fini = 0;
+			stop_motor();
+    	}
+    }
+}
+
+void start_program(void){
+	chThdCreateStatic(waMouvement, sizeof(waMouvement), NORMALPRIO, Mouvement, NULL);
+}
 
