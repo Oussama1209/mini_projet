@@ -10,28 +10,27 @@
 #define NB_OF_PHASES        4  //number of phases of the motors
 #define WHEEL_PERIMETER     13 // [cm]
 #define PI                  3.1415926536f
+#define ONE_SEC 			SystemCoreClock/16
 //TO ADJUST IF NECESSARY. NOT ALL THE E-PUCK2 HAVE EXACTLY THE SAME WHEEL DISTANCE
 #define WHEEL_DISTANCE      5.35f    //cm
 #define PERIMETER_EPUCK     (PI * WHEEL_DISTANCE)
 //Dimension de la planche
-#define distance_x				200		//largeur in mm
-#define	distance_y				300		//longueur in mm
-#define SAMPLE_SIZE				5000	//number of samples used
-#define SIDES					4		//number of sides of the board
-#define POINTS					2		//number of points to determine on the board
+#define distance_x			200		//largeur in mm
+#define	distance_y			300		//longueur in mm
+#define SAMPLE_SIZE			10000	//number of samples used
+#define SIDES				4		//number of sides of the board
+#define POINTS				2		//number of points to determine on the board
 
-#define MUR_DETECTER			0
-#define AUCUN_MUR				1
-#define SIZE_TAB				2		//taille du tableau
-#define TARAUDAGE				0
-#define PERCAGE					1
+#define MUR_DETECTER		0
+#define AUCUN_MUR			1
+#define SIZE_TAB			2		//taille du tableau
+#define TARAUDAGE			0
+#define PERCAGE				1
 
 static int avg_distance=0;
 static int distance_min=8000;
 static int tab_angle[SAMPLE_SIZE];
 static int sides[SIDES];
-static int Points_X[POINTS];
-static int Points_Y[POINTS];
 
 static bool detection_mur = AUCUN_MUR;
 static uint8_t pos_tab = 0;
@@ -47,6 +46,14 @@ struct Mypoint {
 
 static struct Mypoint tab_point[2] = {{10, 10, 2, TARAUDAGE}, {20, 20, 3, PERCAGE}};
 
+// Simple delay function
+void delay(unsigned int n)
+{
+    while (n--) {
+        __asm__ volatile ("nop");
+    }
+}
+
 void init_position_motor(void){
 	right_motor_set_pos(0);
 	left_motor_set_pos(0);
@@ -56,6 +63,7 @@ void set_motor_speed(uint16_t speed){
 	left_motor_set_speed(speed);
 	right_motor_set_speed(speed);
 }
+
 //Faire un quart de tour
 void quarter_turns(uint8_t num_of_quarter_turns, int8_t direction){
 	init_position_motor();
@@ -86,7 +94,7 @@ void nieme_turn(uint8_t nieme_value, int8_t direction){
 
 //the TOF waits a certain time before calculating distance
 int check_distance(void){
-	wait(5000000); //mettre la fonction Thdsleepmilisecond...
+//	wait(5000000); //mettre la fonction Thdsleepmilisecond...
 	return VL53L0X_get_dist_mm();
 }
 
@@ -105,14 +113,37 @@ void stop_motor(void){
 }
 
 //sets the robot on a perpendicular line to the side that the user faced it towards
-void calibration_angle(int direction){
+void calibration_angle(void){
 
+	int direction;
 	int calibration_check=0;
 	int min=0;
 
 	// approaches the side that the user puts it in front of
-	while(VL53L0X_get_dist_mm()>150){
+	while(VL53L0X_get_dist_mm()>100){
 		go_forward();
+	}
+
+	bool turn_right=false;
+	delay(ONE_SEC);
+	int test_1=VL53L0X_get_dist_mm();
+	delay(ONE_SEC);
+	nieme_turn(10,-1);
+	delay(ONE_SEC);
+	int test_2=VL53L0X_get_dist_mm();
+	delay(ONE_SEC);
+	nieme_turn(10,-1);
+	delay(ONE_SEC);
+	int test_3=VL53L0X_get_dist_mm();
+	delay(ONE_SEC);
+	turn_right=(test_1>test_2)&&(test_2<test_3)&&(test_3<test_1);
+	if(turn_right) {
+		direction=-1;
+//		nieme_turn(5,1);
+	}
+	else{
+		direction=1;
+		nieme_turn(5,1);
 	}
 
 	//makes small turns (1/200 turn) and compares the distance it receives with the ones before
@@ -121,9 +152,8 @@ void calibration_angle(int direction){
 
 		//takes average of the vales of distance the TOF receives
 		for(int i=0;i<SAMPLE_SIZE;i++){
+//			wait(500);
 			tab_angle[i] = VL53L0X_get_dist_mm();
-			wait(500);
-
 			avg_distance+=tab_angle[i];
 		}
 		avg_distance=avg_distance/SAMPLE_SIZE;
@@ -143,10 +173,11 @@ void calibration_angle(int direction){
 
 		//makes 1/200 turn
 		nieme_turn(200,direction);
+		delay(ONE_SEC);
 	}
 
 	//returns back to the perpendicular line
-	for(int i=0;i<6;i++) nieme_turn(200,1);
+	for(int i=0;i<7;i++) nieme_turn(200,-direction);
 
 	//sets the values to their original ones for another calibration
 	distance_min=8000;
@@ -160,7 +191,7 @@ void perpendiculaire(void){
 		//takes average of the vales of distance the TOF receives
 		for(int i=0;i<SAMPLE_SIZE;i++){
 			//chThdSleepMilliseconds(10);
-			wait(500);
+//			wait(500);
 			avg_distance+=VL53L0X_get_dist_mm();
 		}
 		avg_distance=avg_distance/SAMPLE_SIZE;
@@ -298,7 +329,7 @@ static THD_FUNCTION(Mouvement, arg) {
 				detection_dun_mur();
 			}
 			//on le met perpendiculaire au mur
-			calibration_angle(-1);
+			calibration_angle();
 			chprintf((BaseSequentialStream *)&SD3, "HELLO");
 			//Déterminer axe des y le plus long
 			determine_x_y_axis();
@@ -306,8 +337,9 @@ static THD_FUNCTION(Mouvement, arg) {
 			placement_corner();
 			//aller de l'origine jusqu'au premier point
 			go_from_to(0,0,tab_point[0].x,tab_point[0].y);
-			while(pos_tab < SIZE_TAB){
+			while(pos_tab < SIZE_TAB-1){
 				go_from_to(tab_point[pos_tab].x, tab_point[pos_tab].y, tab_point[pos_tab+1].x, tab_point[pos_tab+1].y);
+				pos_tab++;
 			}
 			programme_fini = 0;
 			stop_motor();

@@ -47,6 +47,7 @@ void go_through_points(struct Mypoint *tab_point[]){
 	for(int i=1;i<2;i++){
 		//go_from_to(Points_X[i-1],Points_Y[i-1],Points_X[i],Points_Y[i]);
 		go_from_to(tab_point[i-1]->x, tab_point[i-1]->y, tab_point[i]->x, tab_point[i]->y);
+*/
 
 
 int main(void)
@@ -65,7 +66,8 @@ int main(void)
     motors_init();
     //Initiation du tableau de valeur
 
-    start_program();
+//    start_program();
+    calibration_angle();
     /*
     //Mettre perpendiculairement aux parois
     calibration_angle(-1);
@@ -87,6 +89,8 @@ int main(void)
 
 }
 
+#define STACK_CHK_GUARD 0xe2dee396
+uintptr_t __stack_chk_guard = STACK_CHK_GUARD;
 
 void __stack_chk_fail(void)
 {

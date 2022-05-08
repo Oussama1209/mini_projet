@@ -3,7 +3,11 @@
 
 struct Mypoint;
 
+// Simple delay function
+void delay(unsigned int n);
+
 void start_program(void);
+
 // Initialize right motor position to 0
 //IMPORTANT TO CALL BEFORE THE WHILE LOOP
 void init_position_motor(void);
@@ -27,7 +31,7 @@ void go_forward(void);
 void stop_motor(void);
 
 //sets the robot on a perpendicular line to the side that the user faced it towards
-void calibration_angle(int direction);
+void calibration_angle(void);
 
 //Mettre le robot perpendiculaire à un bord
 void perpendiculaire(void);
