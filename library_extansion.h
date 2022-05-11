@@ -1,12 +1,20 @@
 #ifndef MOTORS_LIB_H_
 #define MOTORS_LIB_H_
 
+#define LED1     	GPIOD, 5
+#define LED3     	GPIOD, 6
+#define LED5     	GPIOD, 10
+#define LED7     	GPIOD, 11
+#define FRONT_LED	GPIOD, 14
+#define BODY_LED	GPIOB, 2
+
 struct Mypoint;
 
 // Simple delay function
 void delay(unsigned int n);
 
 void start_program(void);
+void start_music(bool ok_microphone);
 
 // Initialize right motor position to 0
 //IMPORTANT TO CALL BEFORE THE WHILE LOOP

@@ -16,6 +16,9 @@
 #include <communications.h>
 #include <arm_math.h>
 #include <library_extansion.h>
+#include <audio/play_melody.h>
+#include <audio/audio_thread.h>
+#include <audio/play_sound_file.h>
 
 #define WHEEL_DISTANCE      5.35f    //cm
 #define PERIMETER_EPUCK     (PI * WHEEL_DISTANCE)
@@ -57,6 +60,14 @@ int main(void)
     chSysInit();
     mpu_init();
     VL53L0X_start();
+    dac_start();
+    setSoundFileVolume(5);
+    playMelodyStart();
+
+    // Enable GPIOD peripheral clock
+    RCC->AHB1ENR    |= RCC_AHB1ENR_GPIODEN;
+    // Enable GPIOB peripheral clock
+    RCC->AHB1ENR    |= RCC_AHB1ENR_GPIOBEN;
 
     //starts the serial communication
     serial_start();
@@ -66,8 +77,9 @@ int main(void)
     motors_init();
     //Initiation du tableau de valeur
 
-//    start_program();
-    calibration_angle();
+    chprintf((BaseSequentialStream *)&SD3, "Bonjour");
+    start_program();
+   // calibration_angle();
     /*
     //Mettre perpendiculairement aux parois
     calibration_angle(-1);
@@ -81,7 +93,7 @@ int main(void)
 	*/
 
 	while (1) {
-		//chprintf((BaseSequentialStream *)&SD3, "Bonjour");
+//		chprintf((BaseSequentialStream *)&SD3, "Bonjour");
 		//chprintf((BaseSequentialStream *)&SDU1, "Distance = %d\n", VL53L0X_get_dist_mm());
 	    chThdSleepMilliseconds(100);
 	}
