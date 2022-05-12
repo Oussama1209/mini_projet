@@ -1,5 +1,5 @@
-#ifndef MOTORS_LIB_H_
-#define MOTORS_LIB_H_
+#ifndef LIBRARY_EXTANSION_H_
+#define LIBRARY_EXTANSION_H_
 
 #define LED1     	GPIOD, 5
 #define LED3     	GPIOD, 6
@@ -16,33 +16,31 @@ void delay(unsigned int n);
 void start_program(void);
 void set_semamvt(void);
 
-// Initialize right motor position to 0
-//IMPORTANT TO CALL BEFORE THE WHILE LOOP
-void init_position_motor(void);
-
-//set speed of left and right motor
-void set_motor_speed(uint16_t speed);
-
-//turns num_of_quarter_turns * 90 degrees
-void quarter_turns(uint8_t num_of_quarter_turns, int8_t direction);
-
-//turns nieme of a turn
-void nieme_turn(uint8_t nieme_value, int8_t direction);
+//// Initialize right and left motor position to
+//void init_position_motor(void);
+//
+////set speed of left and right motor
+//void set_motor_speed(uint16_t speed);
+//
+////turns num_of_quarter_turns * 90 degrees
+//void quarter_turns(uint8_t num_of_quarter_turns, int8_t direction);
+//
+////turns nieme of a turn
+//void nieme_turn(uint8_t nieme_value, int8_t direction);
 
 //the TOF waits a certain time before calculating distance
 int check_distance(void);
-
-//sets the motors to go forward
-void go_forward(void);
-
-//stops the motor
-void stop_motor(void);
+//
+////sets the motors to go forward
+//void go_forward(void);
+//
+////stops the motor
+//void stop_motor(void);
 
 //sets the robot on a perpendicular line to the side that the user faced it towards
 void calibration_angle(void);
 
-//Mettre le robot perpendiculaire à un bord
-void perpendiculaire(void);
+void set_semamvt(void);
 
 //determine the y and x axis on the board
 void determine_x_y_axis(void);
@@ -61,7 +59,10 @@ void go_x(int x_i, int x_f);
 //moves the robot from one point to another
 void go_from_to(int x_i, int y_i, int x_f, int y_f);
 
+void detection_dun_mur(void);
+
+void start_program(void);
 
 
-#endif /* MOTORS_LIB_H  */
+#endif /* LIBRARY_EXTANSION_H  */
 

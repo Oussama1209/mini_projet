@@ -59,11 +59,10 @@ int main(void)
     halInit();
     chSysInit();
     mpu_init();
-    VL53L0X_start();
     dac_start();
     setSoundFileVolume(1);
     playMelodyStart();
-
+    VL53L0X_start();
     // Enable GPIOD peripheral clock
     RCC->AHB1ENR    |= RCC_AHB1ENR_GPIODEN;
     // Enable GPIOB peripheral clock
@@ -76,30 +75,27 @@ int main(void)
     //init the motors
     motors_init();
     //Initiation du tableau de valeur
+    static int tab_angle[5000];
 
-    chprintf((BaseSequentialStream *)&SD3, "Bonjour");
     start_program();
     start_microphone();
-   // calibration_angle();
-    /*
-    //Mettre perpendiculairement aux parois
-    calibration_angle(-1);
-    //Déterminer axe des y le plus long
-	determine_x_y_axis();
-	//Placer le robot dans un coin
-	placement_corner();
-	chprintf((BaseSequentialStream *)&SDU1, "Distance = %d\n", VL53L0X_get_dist_mm());
-	//aller au premier
-	go_from_to(0,0,200,200);
-	*/
-
-	while (1) {
-//		chprintf((BaseSequentialStream *)&SD3, "Bonjour");
-		//chprintf((BaseSequentialStream *)&SDU1, "Distance = %d\n", VL53L0X_get_dist_mm());
-	    chThdSleepMilliseconds(100);
-	}
 
 
+//	while (1) {
+////		chprintf((BaseSequentialStream *)&SD3, "Bonjour");
+//		int avg_distance=0;
+//		for(int i=0;i<5000;i++){
+//			tab_angle[i] = VL53L0X_get_dist_mm();
+//			avg_distance+=tab_angle[i];
+//		}
+//		avg_distance=avg_distance/5000;
+//		chprintf((BaseSequentialStream *)&SD3, "Distance = %d\r\n\n", avg_distance);
+//	    chThdSleepMilliseconds(1000);
+//	}
+//    calibration_angle();
+    while(1){}
+
+	return 0;
 }
 
 #define STACK_CHK_GUARD 0xe2dee396

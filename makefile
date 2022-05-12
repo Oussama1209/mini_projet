@@ -14,6 +14,7 @@ CSRC += ./main.c \
 		./communications.c \
 		./library_extansion.c \
 		./fft.c \
+		./motor_extansion.c \
 		./musique.c \
 
 #Header folders to include
