@@ -1,4 +1,5 @@
 #include "ch.h"
+#include "chbsem.h"
 #include "hal.h"
 #include "motors.h"
 #include "audio_processing.h"
@@ -10,7 +11,8 @@
 
 //Semaphore
 static BSEMAPHORE_DECL(sendasound_sem, TRUE);
-static BSEMAPHORE_DECL(sendamusic_sem, TRUE);
+//static BSEMAPHORE_DECL(sendamusic_sem, TRUE);
+static BSEMAPHORE_DECL(mvtplay_sem, TRUE);
 
 #define SPEED_MOTOR   		600 // speed of motor
 #define NSTEP_ONE_TURN      1000 // number of steps for 1 turn of the motor
@@ -44,7 +46,7 @@ static bool detection_mur = AUCUN_MUR;
 static uint8_t pos_tab = 0;
 static bool programme_fini = 1;
 
-static bool microphone_begin = 0;
+//static bool microphone_begin = 1;
 static bool music_begin = 0;
 
 //structure
@@ -346,88 +348,77 @@ static THD_FUNCTION(Mouvement, arg) {
 			//perpendiculaire();
 			placement_corner();
 			//aller de l'origine jusqu'au premier point
+			chBSemSignal(&mvtplay_sem);
+			chBSemWait(&sendasound_sem);
 			go_from_to(0,0,tab_point[0].x,tab_point[0].y);
 			while(pos_tab < SIZE_TAB-1){
-//				music_begin = 1;
-//				while(music_begin){
-//					chBSemWait(&sendamusic_sem);
-//				}
-
 				//Début partie Microphone
-				microphone_begin = 1;
-				//tant qu'on n'a pas mis la bonne fréquence, on attend
-				while(microphone_begin){
-					chBSemWait(&sendasound_sem);
-				}
+				chBSemSignal(&mvtplay_sem);
+				chBSemWait(&sendasound_sem);
 				//fin partie microphone
 				go_from_to(tab_point[pos_tab].x, tab_point[pos_tab].y, tab_point[pos_tab+1].x, tab_point[pos_tab+1].y);
 				pos_tab++;
 			}
+			chBSemSignal(&mvtplay_sem);
+			chBSemWait(&sendasound_sem);
 			programme_fini = 0;
 			stop_motor();
     	}
     }
 }
 
-static THD_WORKING_AREA(waMicrophone, 256);
-static THD_FUNCTION(Microphone, arg) {
-
-    chRegSetThreadName(__FUNCTION__);
-    (void)arg;
-
-    while(1){
-    	//Commence à écouter s'il y a un son ou non
-    	mic_start(&processAudioData);
-    	//Si le robot est à un point du chemin, alors on attend le signal pour redémarrer
-    	if(microphone_begin){
-    		//Si on a reçu le signal pour redémarrer, on reprend la thread mouvement là où on l'a laissé
-    		if(get_ok()){
-    			chBSemSignal(&sendasound_sem);
-    			microphone_begin = 0;
-    		}
-    	}
-    }
-}
-
-//static THD_WORKING_AREA(waMusic, 256);
-//static THD_FUNCTION(Music, arg) {
+//static THD_WORKING_AREA(waMicrophone, 256);
+//static THD_FUNCTION(Microphone, arg) {
 //
 //    chRegSetThreadName(__FUNCTION__);
 //    (void)arg;
 //
 //    while(1){
-//    	if(music_begin){
-//			if(pos_tab =! 0){
-//				if(tab_point[pos_tab].type == TARAUDAGE){
-//					playMelody(MARIO, ML_SIMPLE_PLAY, NULL);
-//					waitMelodyHasFinished();
-//					music_begin = 0;
-//					chBSemSignal(&sendamusic_sem);
-//				} else {
-//					playMelody(MARIO, ML_SIMPLE_PLAY, NULL);
-//					waitMelodyHasFinished();
-//					music_begin = 0;
-//					chBSemSignal(&sendamusic_sem);
-//				}
-//			} else {
-//				playMelody(MARIO, ML_SIMPLE_PLAY, NULL);
-//				waitMelodyHasFinished();
-//				music_begin = 0;
-//				chBSemSignal(&sendamusic_sem);
-//			}
-//    	}
+//    	if(microphone_begin) chBSemWait(&sendamusic_sem);
+//    	microphone_begin = 0;
+//    	//Commence à écouter s'il y a un son ou non
+//    	mic_start(&processAudioData);
+//   		//Si on a reçu le signal pour redémarrer, on reprend la thread mouvement là où on l'a laissé
+//   		if(get_ok()){
+//   			microphone_begin = 1;
+//   			chBSemSignal(&sendasound_sem);
+//   		}
 //    }
 //}
+
+static THD_WORKING_AREA(waMusic, 256);
+static THD_FUNCTION(Music, arg) {
+
+    chRegSetThreadName(__FUNCTION__);
+    (void)arg;
+
+    while(1){
+    	chBSemWait(&mvtplay_sem);
+//    	palTogglePad(GPIOD, GPIOD_LED7);
+//		delay(3*ONE_SEC);
+//		palTogglePad(GPIOD, GPIOD_LED7);
+		if(tab_point[pos_tab].type == TARAUDAGE){
+			playMelody(MARIO_START, ML_SIMPLE_PLAY, NULL);
+			waitMelodyHasFinished();
+			stopCurrentMelody();
+		} else {
+			playMelody(MARIO_DEATH, ML_SIMPLE_PLAY, NULL);
+			waitMelodyHasFinished();
+			stopCurrentMelody();
+//			chBSemSignal(&sendamusic_sem);
+		}
+//		chBSemSignal(&sendamusic_sem);
+		set_semamicro();
+    }
+}
 
 
 void start_program(void){
 	chThdCreateStatic(waMouvement, sizeof(waMouvement), NORMALPRIO, Mouvement, NULL);
-	chThdCreateStatic(waMicrophone, sizeof(waMicrophone), NORMALPRIO, Microphone, NULL);
-//	playMelodyStart();
-//	chThdCreateStatic(waMusic, sizeof(waMusic), NORMALPRIO, Music, NULL);
+//	chThdCreateStatic(waMicrophone, sizeof(waMicrophone), NORMALPRIO, Microphone, NULL);
+	chThdCreateStatic(waMusic, sizeof(waMusic), NORMALPRIO, Music, NULL);
 }
 
-void start_music(bool ok_microphone){
-	microphone_begin = ok_microphone;
-	chThdCreateStatic(waMicrophone, sizeof(waMicrophone), NORMALPRIO, Microphone, NULL);
+void set_semamvt(void){
+	chBSemSignal(&sendasound_sem);
 }

@@ -61,7 +61,7 @@ int main(void)
     mpu_init();
     VL53L0X_start();
     dac_start();
-    setSoundFileVolume(5);
+    setSoundFileVolume(1);
     playMelodyStart();
 
     // Enable GPIOD peripheral clock
@@ -79,6 +79,7 @@ int main(void)
 
     chprintf((BaseSequentialStream *)&SD3, "Bonjour");
     start_program();
+    start_microphone();
    // calibration_angle();
     /*
     //Mettre perpendiculairement aux parois

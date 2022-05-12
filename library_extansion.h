@@ -14,7 +14,7 @@ struct Mypoint;
 void delay(unsigned int n);
 
 void start_program(void);
-void start_music(bool ok_microphone);
+void set_semamvt(void);
 
 // Initialize right motor position to 0
 //IMPORTANT TO CALL BEFORE THE WHILE LOOP

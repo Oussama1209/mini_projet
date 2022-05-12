@@ -13,6 +13,7 @@
 
 //semaphore
 static BSEMAPHORE_DECL(sendToComputer_sem, TRUE);
+static BSEMAPHORE_DECL(sendamusic_sem, TRUE);
 
 //2 times FFT_SIZE because these arrays contain complex numbers (real + imaginary)
 static float micLeft_cmplx_input[2 * FFT_SIZE];
@@ -26,6 +27,7 @@ static float micFront_output[FFT_SIZE];
 static float micBack_output[FFT_SIZE];
 
 static bool can_go = 0;
+static bool microphone_begin = 1;
 
 #define MIN_VALUE_THRESHOLD	10000 
 
@@ -33,15 +35,9 @@ static bool can_go = 0;
 //#define FREQ_FORWARD	16	//250Hz
 //#define FREQ_LEFT		19	//296Hz
 //#define FREQ_RIGHT		23	//359HZ
-#define FREQ_GO			26	//406Hz
-#define MAX_FREQ		30	//we don't analyze after this index to not use resources for nothing
+#define FREQ_GO			65	//406Hz
+#define MAX_FREQ		70	//we don't analyze after this index to not use resources for nothing
 
-//#define FREQ_FORWARD_L		(FREQ_FORWARD-1)
-//#define FREQ_FORWARD_H		(FREQ_FORWARD+1)
-//#define FREQ_LEFT_L			(FREQ_LEFT-1)
-//#define FREQ_LEFT_H			(FREQ_LEFT+1)
-//#define FREQ_RIGHT_L		(FREQ_RIGHT-1)
-//#define FREQ_RIGHT_H		(FREQ_RIGHT+1)
 #define FREQ_GO_L			(FREQ_GO-1)
 #define FREQ_GO_H			(FREQ_GO+1)
 static bool ok = 0;
@@ -62,7 +58,7 @@ void sound_remote(float* data){
 		}
 	}
 
-	if(max_norm_index >= FREQ_GO_L /*&& max_norm_index <= FREQ_GO_H*/){
+	if(max_norm_index >= FREQ_GO_L && max_norm_index <= FREQ_GO_H){
 		ok = 1;
 	} else {
 		ok = 0;
@@ -188,4 +184,31 @@ float* get_audio_buffer_ptr(BUFFER_NAME_t name){
 
 bool get_ok(void){
 	return ok;
+}
+
+static THD_WORKING_AREA(waMicrophone, 256);
+static THD_FUNCTION(Microphone, arg) {
+
+    chRegSetThreadName(__FUNCTION__);
+    (void)arg;
+
+    while(1){
+    	if(microphone_begin) chBSemWait(&sendamusic_sem);
+    	microphone_begin = 0;
+    	//Commence à écouter s'il y a un son ou non
+    	mic_start(&processAudioData);
+   		//Si on a reçu le signal pour redémarrer, on reprend la thread mouvement là où on l'a laissé
+   		if(get_ok()){
+   			microphone_begin = 1;
+   			set_semamvt();
+   		}
+    }
+}
+
+void set_semamicro(void){
+	chBSemSignal(&sendamusic_sem);
+}
+
+void start_microphone(void){
+	chThdCreateStatic(waMicrophone, sizeof(waMicrophone), NORMALPRIO, Microphone, NULL);
 }
