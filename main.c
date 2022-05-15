@@ -22,17 +22,8 @@
 
 #define WHEEL_DISTANCE      5.35f    //cm
 #define PERIMETER_EPUCK     (PI * WHEEL_DISTANCE)
-/*
-//structure
-struct Mypoint {
-	int x; //coordonnée en x en mm
-	int y; //coordonnée en y en mm
-	int diametre; //diamètre en mm
-	uint8_t type; //type de trou : perçage = p, taraudage = t
-};*/
 
 //static struct Mypoint tab_point[2] = {{40, 40, 2, TARAUDAGE}, {90, 90, 3, PERCAGE}};
-
 static void serial_start(void)
 {
 	static SerialConfig ser_cfg = {
@@ -74,11 +65,11 @@ int main(void)
     usb_start();
     //init the motors
     motors_init();
-    //Initiation du tableau de valeur
-    static int tab_angle[5000];
 
     start_program();
+    start_music();
     start_microphone();
+//    led();
 
 
 //	while (1) {

@@ -35,8 +35,8 @@ static bool microphone_begin = 1;
 //#define FREQ_FORWARD	16	//250Hz
 //#define FREQ_LEFT		19	//296Hz
 //#define FREQ_RIGHT		23	//359HZ
-#define FREQ_GO			11	//406Hz
-#define MAX_FREQ		12	//we don't analyze after this index to not use resources for nothing
+#define FREQ_GO			63	//406Hz
+#define MAX_FREQ		67	//we don't analyze after this index to not use resources for nothing
 
 #define FREQ_GO_L			(FREQ_GO-1)
 #define FREQ_GO_H			(FREQ_GO+1)
