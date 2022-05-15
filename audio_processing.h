@@ -17,11 +17,20 @@ typedef enum {
 	BACK_OUTPUT
 } BUFFER_NAME_t;
 
+//Fonction qui détecte à quel fréquence est la plus grande intensité (Donc quel fréquence est joué)
+//Et suivant le son joué, le robot continuera à rouler ou non
 void sound_remote(float* data);
+
+/*
+*	Callback called when the demodulation of the four microphones is done.
+*	We get 160 samples per mic every 10ms (16kHz)
+*
+*	params :
+*	int16_t *data			Buffer containing 4 times 160 samples. the samples are sorted by micro
+*							so we have [micRight1, micLeft1, micBack1, micFront1, micRight2, etc...]
+*	uint16_t num_samples	Tells how many data we get in total (should always be 640)
+*/
 void processAudioData(int16_t *data, uint16_t num_samples);
-bool get_ok(void);
-void start_microphone(void);
-void set_semamicro(void);
 
 /*
 *	put the invoking thread into sleep until it can process the audio datas
@@ -32,5 +41,11 @@ void wait_send_to_computer(void);
 *	Returns the pointer to the BUFFER_NAME_t buffer asked
 */
 float* get_audio_buffer_ptr(BUFFER_NAME_t name);
+
+//Envoie le signal de la sémaphore sendamusic
+void set_semamicro(void);
+
+//Crée la thread microphone
+void start_microphone(void);
 
 #endif /* AUDIO_PROCESSING_H */

@@ -12,42 +12,9 @@
 #define TARAUDAGE			0
 #define PERCAGE				1
 
-typedef enum {
-	two_mm=0,
-	four_mm,
-	six_mm,
-	eight_mm
-};
-
 // semaphore
 static BSEMAPHORE_DECL(mvtplay_sem, TRUE);
 
-void LED_Toggle(uint8_t diametre ){
-
-	switch(diametre){
-		case two_mm:
-			palTogglePad(GPIOD, GPIOD_LED7);
-			break;
-		case four_mm:
-			palTogglePad(GPIOD, GPIOD_LED7);
-			palTogglePad(GPIOD, GPIOD_LED5);
-			break;
-		case six_mm:
-			palTogglePad(GPIOD, GPIOD_LED7);
-			palTogglePad(GPIOD, GPIOD_LED5);
-			palTogglePad(GPIOD, GPIOD_LED3);
-			break;
-		case eight_mm:
-			palTogglePad(GPIOD, GPIOD_LED7);
-			palTogglePad(GPIOD, GPIOD_LED5);
-			palTogglePad(GPIOD, GPIOD_LED3);
-			palTogglePad(GPIOD, GPIOD_LED1);
-			break;
-		default:
-			break;
-	}
-
-}
 static THD_WORKING_AREA(waMusic, 256);
 static THD_FUNCTION(Music, arg) {
 
@@ -55,31 +22,33 @@ static THD_FUNCTION(Music, arg) {
     (void)arg;
 
     while(1){
+    	//Tant que la thread mouvement n'a pas atteint un trou, alors on ne joue aucune musique
     	chBSemWait(&mvtplay_sem);
+
+    	//Si le type est taraudage, on joue Mario start, s'il est Perçage, on joue Mario death
+    	//Et si c'est le premier trou, on ne joue aucune musique
 		if(get_tab_point() == TARAUDAGE){
-			LED_Toggle(get_diametre());
-//			wait(50000000);
 			playMelody(MARIO_START, ML_SIMPLE_PLAY, NULL);
+			//on s'assure que la musique a été complètement joué avant de permettre à la thread
+			//microphone de se lancer et d'écouter des sons
 			waitMelodyHasFinished();
 			stopCurrentMelody();
-			LED_Toggle(get_diametre());
-		} else {
-			LED_Toggle(get_diametre());
-//			wait(50000000);
+		} else if (get_tab_point() == PERCAGE) {
 			playMelody(MARIO_DEATH, ML_SIMPLE_PLAY, NULL);
 			waitMelodyHasFinished();
 			stopCurrentMelody();
-			LED_Toggle(get_diametre());
 		}
 		set_semamicro();
     }
 
 }
 
+//Envoie le signal de la sémaphore mvtplay
 void set_semamvtplay(void){
 	chBSemSignal(&mvtplay_sem);
 }
 
+//Crée la thread musique
 void start_music(void){
 	chThdCreateStatic(waMusic, sizeof(waMusic), NORMALPRIO, Music, NULL);
 }

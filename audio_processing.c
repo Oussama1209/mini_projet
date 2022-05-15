@@ -8,6 +8,7 @@
 #include <audio/microphone.h>
 #include <audio_processing.h>
 #include <communications.h>
+#include <library_extansion.h>
 #include <fft.h>
 #include <arm_math.h>
 
@@ -31,26 +32,24 @@ static bool microphone_begin = 1;
 
 #define MIN_VALUE_THRESHOLD	10000 
 
-#define MIN_FREQ		10	//we don't analyze before this index to not use resources for nothing
-//#define FREQ_FORWARD	16	//250Hz
-//#define FREQ_LEFT		19	//296Hz
-//#define FREQ_RIGHT		23	//359HZ
-#define FREQ_GO			63	//406Hz
-#define MAX_FREQ		67	//we don't analyze after this index to not use resources for nothing
+#define MIN_FREQ		50	//C'est la plus petite fréquence que nous allons analyser
+#define FREQ_GO			63	//63*15.625=984Hz -> la bonne fréquence
+#define MAX_FREQ		67	//C'est la plus grande fréquence que nous allons analyser
 
+//La range de fréquence que le robot acceptera avant de continuer
 #define FREQ_GO_L			(FREQ_GO-1)
 #define FREQ_GO_H			(FREQ_GO+1)
+
+//La booléenne qui dira si la bonne fréquence a été joué ou non
 static bool ok = 0;
 
-/*
-*	Simple function used to detect the highest value in a buffer
-*	and to execute a motor command depending on it
-*/
+//Fonction qui détecte à quel fréquence est la plus grande intensité (Donc quel fréquence est joué)
+//Et suivant le son joué, le robot continuera à rouler ou non
 void sound_remote(float* data){
 	float max_norm = MIN_VALUE_THRESHOLD;
 	int16_t max_norm_index = -1; 
 
-	//search for the highest peak
+	//Recherche du pique d'intensité
 	for(uint16_t i = MIN_FREQ ; i <= MAX_FREQ ; i++){
 		if(data[i] > max_norm){
 			max_norm = data[i];
@@ -58,6 +57,8 @@ void sound_remote(float* data){
 		}
 	}
 
+	//Si le pique d'intensité est aux alentours de 984Hz, alors on met le bool à ok
+	//On a détecté la bonne fréquence!
 	if(max_norm_index >= FREQ_GO_L && max_norm_index <= FREQ_GO_H){
 		ok = 1;
 	} else {
@@ -182,10 +183,7 @@ float* get_audio_buffer_ptr(BUFFER_NAME_t name){
 	}
 }
 
-bool get_ok(void){
-	return ok;
-}
-
+//La thread microphone
 static THD_WORKING_AREA(waMicrophone, 256);
 static THD_FUNCTION(Microphone, arg) {
 
@@ -193,22 +191,27 @@ static THD_FUNCTION(Microphone, arg) {
     (void)arg;
 
     while(1){
+    	//Si on nous envoie le signal que la musique a été joué, alors on écoute les sons
+    	//jusqu'à entendre la bonne fréquence (984Hz)
     	if(microphone_begin) chBSemWait(&sendamusic_sem);
     	microphone_begin = 0;
     	//Commence à écouter s'il y a un son ou non
     	mic_start(&processAudioData);
    		//Si on a reçu le signal pour redémarrer, on reprend la thread mouvement là où on l'a laissé
-   		if(get_ok()){
+    	//Sinon, on recommence a écouter
+   		if(ok){
    			microphone_begin = 1;
    			set_semamvt();
    		}
     }
 }
 
+//Envoie le signal de la sémaphore sendamusic
 void set_semamicro(void){
 	chBSemSignal(&sendamusic_sem);
 }
 
+//Crée la thread microphone
 void start_microphone(void){
 	chThdCreateStatic(waMicrophone, sizeof(waMicrophone), NORMALPRIO, Microphone, NULL);
 }

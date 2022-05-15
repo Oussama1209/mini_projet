@@ -9,16 +9,12 @@
 #define BODY_LED	GPIOB, 2
 
 struct Mypoint;
-void go(void);
+
 // Simple delay function
 void delay(unsigned int n);
 
-void start_program(void);
-void set_semamvt(void);
-
-uint8_t get_diametre(void);
-
-void set_semamvt(void);
+//Fonction pour allumer les leds en fontion du diamètre du trou
+void LED_Toggle(void);
 
 //determine the y and x axis on the board
 void determine_x_y_axis(void);
@@ -37,14 +33,17 @@ void go_x(uint16_t x_i, uint16_t x_f);
 //moves the robot from one point to another
 void go_from_to(uint16_t x_i, uint16_t y_i, uint16_t x_f, uint16_t y_f);
 
+//Détecte s'il y a un mur à moins de 20cm
 void detection_dun_mur(void);
 
+//Création de la thread mouvement
 void start_program(void);
 
-uint8_t get_pos_tab(void);
+//Envoie le signal de la sémaphore sendasound
+void set_semamvt(void);
 
+//Renvoie le type du trou sur lequel est le robot
 uint8_t get_tab_point(void);
-
 
 #endif /* LIBRARY_EXTANSION_H  */
 

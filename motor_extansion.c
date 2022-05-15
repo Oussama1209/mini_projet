@@ -18,18 +18,19 @@
 #define RIGHT				-1
 #define	LEFT				1
 
-
+//Initialize motor position
 void init_position_motor(void){
 	right_motor_set_pos(0);
 	left_motor_set_pos(0);
 }
 
+//set moor speed to a certain speed
 void set_motor_speed(uint16_t speed){
 	left_motor_set_speed(speed);
 	right_motor_set_speed(speed);
 }
 
-//Faire un quart de tour
+//Turn a number of quarter turns
 void quarter_turns(uint8_t num_of_quarter_turns, int8_t direction){
 
 	//initialize motor position
@@ -49,7 +50,7 @@ void quarter_turns(uint8_t num_of_quarter_turns, int8_t direction){
 
 }
 
-//Tourner d'un n ième tour
+//Turn 1/n turn
 void nieme_turn(uint8_t nieme_value, int8_t direction){
 	init_position_motor();
 	left_motor_set_speed(-direction * SPEED_MOTOR);

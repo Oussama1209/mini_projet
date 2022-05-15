@@ -8,17 +8,20 @@
 #include <chprintf.h>
 #include <sensors/VL53L0X/VL53L0X.h>
 #include <audio/play_melody.h>
+#include <musique.h>
 
 typedef enum {
 	two_mm=0,
 	four_mm,
 	six_mm,
-	eight_mm
+	eight_mm,
+	no_mm
 };
 
-//Semaphore
+//Sémaphore
 static BSEMAPHORE_DECL(sendasound_sem, TRUE);
 
+//Les define
 #define ONE_SEC 			SystemCoreClock/16
 //TO ADJUST IF NECESSARY. NOT ALL THE E-PUCK2 HAVE EXACTLY THE SAME WHEEL DISTANCE
 #define WHEEL_DISTANCE      5.35f    //cm
@@ -28,24 +31,28 @@ static BSEMAPHORE_DECL(sendasound_sem, TRUE);
 #define	distance_y			500		//longueur in mm
 #define SIDES				4		//number of sides of the board
 
+//Pour la calibration de l'angle du robot
 #define CALIBRATION_FINI	0
 #define CALIBRATION_EN_COURS	1
 #define MUR_DETECTER		0
 #define AUCUN_MUR			1
-#define SIZE_TAB			6		//taille du tableau
 #define RIGHT				-1
 #define	LEFT				1
+
+//Pour les informations du tableau de donnée de la position des trous
+#define SIZE_TAB			7		//taille du tableau
 #define TARAUDAGE			0
 #define PERCAGE				1
+#define PREMIER_TROU		2
 
+//Variable
 static uint16_t avg_distance=0;
 static uint16_t distance_min=2000;
-static int sides[SIDES];
-
+static int sides[SIDES];			//Pour déterminer l'axe x et y
 static bool detection_mur = AUCUN_MUR;
-static bool detection_calibration = CALIBRATION_EN_COURS;
-static uint8_t pos_tab = 0;
-static bool programme_fini = 1;
+static bool detection_calibration = CALIBRATION_EN_COURS;	//Pour savoir si on a déjà calibré ou non
+static uint8_t pos_tab = 0;		//Pour savoir où on est dans le tableau de donnée
+static bool programme_fini = 1;		//Pour savoir si on n'a fini le programme
 
 //structure
 struct Mypoint {
@@ -55,9 +62,10 @@ struct Mypoint {
 	uint8_t type; //type de trou : perçage = p, taraudage = t
 };
 
-static struct Mypoint tab_point[SIZE_TAB] = {{50, 50, two_mm, TARAUDAGE}, {100, 100, four_mm, PERCAGE},
+//Tableau des données de la position des trous, de leur type et de leur dimension
+static struct Mypoint tab_point[SIZE_TAB] = {{0, 0, no_mm ,PREMIER_TROU}, {50, 50, two_mm, TARAUDAGE}, {100, 100, four_mm, PERCAGE},
 											{200, 200, six_mm, TARAUDAGE}, {280, 250, eight_mm, PERCAGE},
-											{200, 300, 6, TARAUDAGE}, {100, 100, eight_mm, PERCAGE}};
+											{200, 300, six_mm, TARAUDAGE}, {100, 100, eight_mm, PERCAGE}};
 
 // Simple delay function
 void delay(unsigned int n)
@@ -67,10 +75,36 @@ void delay(unsigned int n)
     }
 }
 
-uint8_t get_diametre(void){
-	return tab_point[pos_tab].diametre;
-}
+//Fonction pour allumer les leds en fontion du diamètre du trou
+void LED_Toggle(void){
 
+	switch(tab_point[pos_tab].diametre){
+		//Si le trou est de 2mm, on allume 1 Led, s'il est de 4mm, on allume 2 leds
+		//S'il est de 6mm, on allume 3 leds et s'il est de 8mm, on allume les 4 leds
+		case two_mm:
+			palTogglePad(GPIOD, GPIOD_LED7);
+			break;
+		case four_mm:
+			palTogglePad(GPIOD, GPIOD_LED7);
+			palTogglePad(GPIOD, GPIOD_LED5);
+			break;
+		case six_mm:
+			palTogglePad(GPIOD, GPIOD_LED7);
+			palTogglePad(GPIOD, GPIOD_LED5);
+			palTogglePad(GPIOD, GPIOD_LED3);
+			break;
+		case eight_mm:
+			palTogglePad(GPIOD, GPIOD_LED7);
+			palTogglePad(GPIOD, GPIOD_LED5);
+			palTogglePad(GPIOD, GPIOD_LED3);
+			palTogglePad(GPIOD, GPIOD_LED1);
+			break;
+		case no_mm:			//Si c'est le premier trou, on ne fait rien
+			break;
+		default:
+			break;
+	}
+}
 
 //determine the y and x axis on the board
 void determine_x_y_axis(void){
@@ -176,11 +210,35 @@ void go_from_to(uint16_t x_i, uint16_t y_i, uint16_t x_f, uint16_t y_f){
 //detect a wall
 //mainly used to know when to start the program
 void detection_dun_mur(void){
-
+	//Si le robot mesure qu'il est à une distance plus petite que 20cm de quelque chose, alors il y a un mur
 	if(VL53L0X_get_dist_mm() < 2000) {
 		detection_mur = MUR_DETECTER;
 	}
-
+}
+int8_t check_direction(void){
+	int8_t direction=0;
+	stop_motor();
+	bool turn_right=false;
+	delay(ONE_SEC);
+	int test_1=VL53L0X_get_dist_mm();
+	delay(ONE_SEC);
+	nieme_turn(20,RIGHT);
+	delay(ONE_SEC);
+	int test_2=VL53L0X_get_dist_mm();
+	delay(ONE_SEC);
+	nieme_turn(20,RIGHT);
+	delay(ONE_SEC);
+	int test_3=VL53L0X_get_dist_mm();
+	delay(ONE_SEC);
+	turn_right=(test_2<test_3)&&(test_3>test_1);
+	if(turn_right) {
+		direction=RIGHT;
+		nieme_turn(5,LEFT);
+	}
+	else{
+		direction=LEFT;
+	}
+	return direction;
 }
 
 //sets the robot on a perpendicular line to the side that the user faced it towards
@@ -189,10 +247,14 @@ static THD_FUNCTION(Calibration, arg) {
 
     VL53L0X_start();
 
-//	while(1){
+    //Initialisation des variables de la thread
+	int8_t direction;
+	uint8_t calibration_check=0;
+	uint8_t min=0;
+
+	while(1){
+		//Si on n'a pas encore fait de calibration, alors on en fait une
 	    if(detection_calibration){
-
-
 			//Regarde si on détecte un mur, si oui, on commence le programme
 			while(detection_mur){
 				detection_dun_mur();
@@ -201,36 +263,11 @@ static THD_FUNCTION(Calibration, arg) {
 			chRegSetThreadName(__FUNCTION__);
 			(void)arg;
 
-
-			int8_t direction;
-			uint8_t calibration_check=0;
-			uint8_t min=0;
-
 			// approaches the side that the user puts it in front of
 			while(VL53L0X_get_dist_mm()>100){
 				go_forward();
 			}
-			stop_motor();
-			bool turn_right=false;
-			delay(ONE_SEC);
-			int test_1=VL53L0X_get_dist_mm();
-			delay(ONE_SEC);
-			nieme_turn(20,RIGHT);
-			delay(ONE_SEC);
-			int test_2=VL53L0X_get_dist_mm();
-			delay(ONE_SEC);
-			nieme_turn(20,RIGHT);
-			delay(ONE_SEC);
-			int test_3=VL53L0X_get_dist_mm();
-			delay(ONE_SEC);
-			turn_right=(test_2<test_3)&&(test_3>test_1);
-			if(turn_right) {
-				direction=RIGHT;
-				nieme_turn(5,LEFT);
-			}
-			else{
-				direction=LEFT;
-			}
+			direction=check_direction();
 
 			//makes small turns (1/200 turn) and compares the distance it receives with the ones before
 			//if the distance gets lower and goes higher after then it means it was perpendicular to the side it faces
@@ -262,9 +299,11 @@ static THD_FUNCTION(Calibration, arg) {
 			}
 			detection_calibration=CALIBRATION_FINI;
 		}
-//	}
+	    chThdSleepMilliseconds(100);
+	}
 }
 
+//Thread reponsible for the movement of the e-puck through the the points
 static THD_WORKING_AREA(waMouvement, 256);
 static THD_FUNCTION(Mouvement, arg) {
 
@@ -273,37 +312,32 @@ static THD_FUNCTION(Mouvement, arg) {
 
     VL53L0X_start();
 
-
-
     while(1){
     	if(programme_fini){
-			//Regarde si on détecte un mur, si oui, on commence le programme
-//			while(detection_mur){
-//				detection_dun_mur();
-//			}
-			//on le met perpendiculaire au mur
-//			calibration_angle();
 			delay(ONE_SEC);
-//			delay(ONE_SEC*20);
-			//chprintf((BaseSequentialStream *)&SD3, "HELLO");
 			//Déterminer axe des y le plus long
 			determine_x_y_axis();
 			//perpendiculaire();
 			placement_corner();
-			//aller de l'origine jusqu'au premier point
+
+			//Dit à la musique qu'elle peut lancer le microphone (car c'est le premier trou)
 			set_semamvtplay();
+			//Attend que microphone entende 984Hz
 			chBSemWait(&sendasound_sem);
-			go_from_to(0,0,tab_point[0].x,tab_point[0].y);
+
+			//Parcours le tableau pour aller de points en points
 			while(pos_tab < SIZE_TAB-1){
-				//Début partie Microphone
-				set_semamvtplay();
-				chBSemWait(&sendasound_sem);
-				//fin partie microphone
 				go_from_to(tab_point[pos_tab].x, tab_point[pos_tab].y, tab_point[pos_tab+1].x, tab_point[pos_tab+1].y);
 				pos_tab++;
+				//Allume les leds qui détermine la taille du trou
+				LED_Toggle();
+				//Dit à musique qu'elle peut se lancer
+				set_semamvtplay();
+				//Attend que microphone entende une certaine fréquence
+				chBSemWait(&sendasound_sem);
+				//éteinds les leds
+				LED_Toggle();
 			}
-			set_semamvtplay();
-			chBSemWait(&sendasound_sem);
 			programme_fini = 0;
 			stop_motor();
     	}
@@ -311,19 +345,18 @@ static THD_FUNCTION(Mouvement, arg) {
 
 }
 
+//Crée la thread callibration et mouvement
 void start_program(void){
 	chThdCreateStatic(waCalibration, sizeof(waCalibration), NORMALPRIO + 1, Calibration, NULL);
 	chThdCreateStatic(waMouvement, sizeof(waMouvement), NORMALPRIO, Mouvement, NULL);
 }
 
+//Envoie le signal de la sémaphore sendasound
 void set_semamvt(void){
 	chBSemSignal(&sendasound_sem);
 }
 
-uint8_t get_pos_tab(void){
-	return pos_tab;
-}
-
+//Renvoie le type du trou sur lequel est le robot
 uint8_t get_tab_point(void){
 	return tab_point[pos_tab].type;
 }

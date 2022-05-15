@@ -1,16 +1,18 @@
+#include <main.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <chprintf.h>
 
 #include "ch.h"
 #include "hal.h"
 #include "memory_protection.h"
 #include <usbcfg.h>
-#include <main.h>
-#include <chprintf.h>
+
 #include <motors.h>
 #include <audio/microphone.h>
-
+#include <musique.h>
+#include <sensors/VL53L0X/VL53L0X.h>
 #include <audio_processing.h>
 #include <fft.h>
 #include <communications.h>
@@ -42,62 +44,37 @@ void go_through_points(struct Mypoint *tab_point[]){
 		go_from_to(tab_point[i-1]->x, tab_point[i-1]->y, tab_point[i]->x, tab_point[i]->y);
 */
 
+void initialisation(void){
+	halInit();
+	chSysInit();
+	mpu_init();
+	dac_start();
+	setSoundFileVolume(1);
+	playMelodyStart();
+	VL53L0X_start();
+
+   //starts the serial communication
+   serial_start();
+   //starts the USB communication
+   usb_start();
+   //init the motors
+   motors_init();
+}
+
 
 int main(void)
 {
 	//initialisation
-    halInit();
-    chSysInit();
-    mpu_init();
-    dac_start();
-    setSoundFileVolume(1);
-    playMelodyStart();
-    VL53L0X_start();
-    // Enable GPIOD peripheral clock
-    RCC->AHB1ENR    |= RCC_AHB1ENR_GPIODEN;
-    // Enable GPIOB peripheral clock
-    RCC->AHB1ENR    |= RCC_AHB1ENR_GPIOBEN;
+	initialisation();
 
-    //starts the serial communication
-    serial_start();
-    //starts the USB communication
-    usb_start();
-    //init the motors
-    motors_init();
-//    VL53L0X_start();
-//    calibration_angle();
+	//Lancer les threads mouvements, musique et microphone
     start_program();
     start_music();
     start_microphone();
-//    led();
-//    go();
-//    while(VL53L0X_get_dist_mm()>320-100){
-//    	go_forward();
-//    }
-//    stop_motor();
-//    quarter_turns(1,RIGHT);
-//    while(VL53L0X_get_dist_mm()>distance_x-x_f){
-//    	go_forward();
-//    }
-//    quarter_turns(1,LEFT);
-//    stop_motor();
 
-
-//	while (1) {
-////		chprintf((BaseSequentialStream *)&SD3, "Bonjour");
-//		int avg_distance=0;
-//		for(int i=0;i<5000;i++){
-//			tab_angle[i] = VL53L0X_get_dist_mm();
-//			avg_distance+=tab_angle[i];
-//		}
-//		avg_distance=avg_distance/5000;
-//		chprintf((BaseSequentialStream *)&SD3, "Distance = %d\r\n\n", avg_distance);
-//	    chThdSleepMilliseconds(1000);
-//	}
-//    calibration_angle();
-    while(1){}
-
-	return 0;
+    while(1){
+    	chThdSleepMilliseconds(100);
+    }
 }
 
 #define STACK_CHK_GUARD 0xe2dee396
