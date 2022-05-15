@@ -28,6 +28,8 @@ static BSEMAPHORE_DECL(sendasound_sem, TRUE);
 #define	distance_y			500		//longueur in mm
 #define SIDES				4		//number of sides of the board
 
+#define CALIBRATION_FINI	0
+#define CALIBRATION_EN_COURS	1
 #define MUR_DETECTER		0
 #define AUCUN_MUR			1
 #define SIZE_TAB			6		//taille du tableau
@@ -41,6 +43,7 @@ static uint16_t distance_min=2000;
 static int sides[SIDES];
 
 static bool detection_mur = AUCUN_MUR;
+static bool detection_calibration = CALIBRATION_EN_COURS;
 static uint8_t pos_tab = 0;
 static bool programme_fini = 1;
 
@@ -68,73 +71,6 @@ uint8_t get_diametre(void){
 	return tab_point[pos_tab].diametre;
 }
 
-
-//sets the robot on a perpendicular line to the side that the user faced it towards
-void calibration_angle(void){
-
-	int8_t direction;
-	uint8_t calibration_check=0;
-	uint8_t min=0;
-
-	// approaches the side that the user puts it in front of
-	while(VL53L0X_get_dist_mm()>100){
-		go_forward();
-	}
-	stop_motor();
-	bool turn_right=false;
-	delay(ONE_SEC);
-	int test_1=VL53L0X_get_dist_mm();
-	delay(ONE_SEC);
-	nieme_turn(20,RIGHT);
-	delay(ONE_SEC);
-	int test_2=VL53L0X_get_dist_mm();
-	delay(ONE_SEC);
-	nieme_turn(20,RIGHT);
-	delay(ONE_SEC);
-	int test_3=VL53L0X_get_dist_mm();
-	delay(ONE_SEC);
-	turn_right=(test_2<test_3)&&(test_3>test_1);
-	if(turn_right) {
-		direction=RIGHT;
-		nieme_turn(5,LEFT);
-	}
-	else{
-		direction=LEFT;
-//		nieme_turn(5,RIGHT);
-	}
-
-	//makes small turns (1/200 turn) and compares the distance it receives with the ones before
-	//if the distance gets lower and goes higher after then it means it was perpendicular to the side it faces
-	while(calibration_check<8){
-
-		delay(ONE_SEC/4);
-		avg_distance=VL53L0X_get_dist_mm();
-		delay(ONE_SEC/4);
-
-		//if distance gets lower it means the perpendicular line is still not obtained
-		if(avg_distance<distance_min) {
-			distance_min=avg_distance;
-			min++;
-			calibration_check=0;
-		}
-
-		//if distance gets higher after it was getting lower for a number of checks then it
-		//confirms the perpendicular line
-		if(avg_distance>distance_min && avg_distance<400 && min>2) {
-			calibration_check++;
-		}
-
-		nieme_turn(200,direction);
-	}
-
-	//returns back to the perpendicular line
-	for(int i=0;i<7;i++) {
-
-		delay(ONE_SEC/2);
-		nieme_turn(200,-direction);
-	}
-
-}
 
 //determine the y and x axis on the board
 void determine_x_y_axis(void){
@@ -170,13 +106,6 @@ void placement_corner(void){
 	stop_motor();
 
 }
-void go(void){
-	for(int i=1;i<6;i++){
-		go_from_to(tab_point[i-1].x,tab_point[i-1].y,tab_point[i].x,tab_point[i].y);
-		delay(10*ONE_SEC);
-	}
-}
-
 
 //moves the robot according to the initial and arrival coordinates of y axis
 //because its in mm it's okey to have int instead of float
@@ -254,74 +183,86 @@ void detection_dun_mur(void){
 
 }
 
+//sets the robot on a perpendicular line to the side that the user faced it towards
 static THD_WORKING_AREA(waCalibration, 256);
 static THD_FUNCTION(Calibration, arg) {
 
-    chRegSetThreadName(__FUNCTION__);
-    (void)arg;
-
     VL53L0X_start();
 
-    int8_t direction;
-   	uint8_t calibration_check=0;
-   	uint8_t min=0;
+//	while(1){
+	    if(detection_calibration){
 
-   	// approaches the side that the user puts it in front of
-   	while(VL53L0X_get_dist_mm()>100){
-   		go_forward();
-   	}
-   	stop_motor();
-   	bool turn_right=false;
-   	delay(ONE_SEC);
-   	int test_1=VL53L0X_get_dist_mm();
-   	delay(ONE_SEC);
-   	nieme_turn(20,RIGHT);
-   	delay(ONE_SEC);
-   	int test_2=VL53L0X_get_dist_mm();
-   	delay(ONE_SEC);
-   	nieme_turn(20,RIGHT);
-   	delay(ONE_SEC);
-   	int test_3=VL53L0X_get_dist_mm();
-   	delay(ONE_SEC);
-   	turn_right=(test_2<test_3)&&(test_3>test_1);
-   	if(turn_right) {
-   		direction=RIGHT;
-   		nieme_turn(5,LEFT);
-   	}
-   	else{
-   		direction=LEFT;
-//		nieme_turn(5,RIGHT);
-   	}
 
-   	//makes small turns (1/200 turn) and compares the distance it receives with the ones before
-   	//if the distance gets lower and goes higher after then it means it was perpendicular to the side it faces
-   	while(calibration_check<8){
+			//Regarde si on détecte un mur, si oui, on commence le programme
+			while(detection_mur){
+				detection_dun_mur();
+			}
 
-   		delay(ONE_SEC/4);
-   		avg_distance=VL53L0X_get_dist_mm();
-   		delay(ONE_SEC/4);
+			chRegSetThreadName(__FUNCTION__);
+			(void)arg;
 
-   		//if distance gets lower it means the perpendicular line is still not obtained
-   		if(avg_distance<distance_min) {
-   			distance_min=avg_distance;
-   			min++;
-   			calibration_check=0;
-   		}
 
-   		//if distance gets higher after it was getting lower for a number of checks then it
-   		//confirms the perpendicular line
-   		if(avg_distance>distance_min && avg_distance<400 && min>2) {
-   			calibration_check++;
-   		}
- 		nieme_turn(200,direction);
-   	}
+			int8_t direction;
+			uint8_t calibration_check=0;
+			uint8_t min=0;
 
-   	//returns back to the perpendicular line
-   	for(int i=0;i<7;i++) {
-    	delay(ONE_SEC/2);
-    	nieme_turn(200,-direction);
-    }
+			// approaches the side that the user puts it in front of
+			while(VL53L0X_get_dist_mm()>100){
+				go_forward();
+			}
+			stop_motor();
+			bool turn_right=false;
+			delay(ONE_SEC);
+			int test_1=VL53L0X_get_dist_mm();
+			delay(ONE_SEC);
+			nieme_turn(20,RIGHT);
+			delay(ONE_SEC);
+			int test_2=VL53L0X_get_dist_mm();
+			delay(ONE_SEC);
+			nieme_turn(20,RIGHT);
+			delay(ONE_SEC);
+			int test_3=VL53L0X_get_dist_mm();
+			delay(ONE_SEC);
+			turn_right=(test_2<test_3)&&(test_3>test_1);
+			if(turn_right) {
+				direction=RIGHT;
+				nieme_turn(5,LEFT);
+			}
+			else{
+				direction=LEFT;
+			}
 
+			//makes small turns (1/200 turn) and compares the distance it receives with the ones before
+			//if the distance gets lower and goes higher after then it means it was perpendicular to the side it faces
+			while(calibration_check<8){
+
+				delay(ONE_SEC/4);
+				avg_distance=VL53L0X_get_dist_mm();
+				delay(ONE_SEC/4);
+
+				//if distance gets lower it means the perpendicular line is still not obtained
+				if(avg_distance<distance_min) {
+					distance_min=avg_distance;
+					min++;
+					calibration_check=0;
+				}
+
+				//if distance gets higher after it was getting lower for a number of checks then it
+				//confirms the perpendicular line
+				if(avg_distance>distance_min && avg_distance<400 && min>2) {
+					calibration_check++;
+				}
+				nieme_turn(200,direction);
+			}
+
+			//returns back to the perpendicular line
+			for(int i=0;i<7;i++) {
+				delay(ONE_SEC/2);
+				nieme_turn(200,-direction);
+			}
+			detection_calibration=CALIBRATION_FINI;
+		}
+//	}
 }
 
 static THD_WORKING_AREA(waMouvement, 256);
@@ -332,12 +273,14 @@ static THD_FUNCTION(Mouvement, arg) {
 
     VL53L0X_start();
 
+
+
     while(1){
     	if(programme_fini){
 			//Regarde si on détecte un mur, si oui, on commence le programme
-			while(detection_mur){
-				detection_dun_mur();
-			}
+//			while(detection_mur){
+//				detection_dun_mur();
+//			}
 			//on le met perpendiculaire au mur
 //			calibration_angle();
 			delay(ONE_SEC);
@@ -369,7 +312,7 @@ static THD_FUNCTION(Mouvement, arg) {
 }
 
 void start_program(void){
-	chThdCreateStatic(waCalibration, sizeof(waCalibration), NORMALPRIO+1, Calibration, NULL);
+	chThdCreateStatic(waCalibration, sizeof(waCalibration), NORMALPRIO + 1, Calibration, NULL);
 	chThdCreateStatic(waMouvement, sizeof(waMouvement), NORMALPRIO, Mouvement, NULL);
 }
 

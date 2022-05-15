@@ -18,9 +18,6 @@ void set_semamvt(void);
 
 uint8_t get_diametre(void);
 
-//sets the robot on a perpendicular line to the side that the user faced it towards
-void calibration_angle(void);
-
 void set_semamvt(void);
 
 //determine the y and x axis on the board
