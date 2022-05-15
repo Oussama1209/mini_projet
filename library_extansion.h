@@ -9,7 +9,7 @@
 #define BODY_LED	GPIOB, 2
 
 struct Mypoint;
-
+void go(void);
 // Simple delay function
 void delay(unsigned int n);
 

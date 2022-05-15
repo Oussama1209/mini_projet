@@ -8,7 +8,6 @@
 #include <chprintf.h>
 #include <sensors/VL53L0X/VL53L0X.h>
 #include <audio/play_melody.h>
-//#include <leds.h>
 
 typedef enum {
 	two_mm=0,
@@ -25,8 +24,8 @@ static BSEMAPHORE_DECL(sendasound_sem, TRUE);
 #define WHEEL_DISTANCE      5.35f    //cm
 #define PERIMETER_EPUCK     (PI * WHEEL_DISTANCE)
 //Dimension de la planche
-#define distance_x			500		//largeur in mm
-#define	distance_y			320		//longueur in mm
+#define distance_x			320		//largeur in mm
+#define	distance_y			500		//longueur in mm
 #define SIDES				4		//number of sides of the board
 
 #define MUR_DETECTER		0
@@ -54,8 +53,8 @@ struct Mypoint {
 };
 
 static struct Mypoint tab_point[SIZE_TAB] = {{50, 50, two_mm, TARAUDAGE}, {100, 100, four_mm, PERCAGE},
-											{200, 200, six_mm, TARAUDAGE}, {300, 300, eight_mm, PERCAGE},
-											{400, 200, 6, TARAUDAGE}, {400, 300, eight_mm, PERCAGE}};
+											{200, 200, six_mm, TARAUDAGE}, {280, 250, eight_mm, PERCAGE},
+											{200, 300, 6, TARAUDAGE}, {100, 100, eight_mm, PERCAGE}};
 
 // Simple delay function
 void delay(unsigned int n)
@@ -108,9 +107,9 @@ void calibration_angle(void){
 	//if the distance gets lower and goes higher after then it means it was perpendicular to the side it faces
 	while(calibration_check<8){
 
-		delay(ONE_SEC/10);
+		delay(ONE_SEC/4);
 		avg_distance=VL53L0X_get_dist_mm();
-		delay(ONE_SEC/10);
+		delay(ONE_SEC/4);
 
 		//if distance gets lower it means the perpendicular line is still not obtained
 		if(avg_distance<distance_min) {
@@ -125,14 +124,14 @@ void calibration_angle(void){
 			calibration_check++;
 		}
 
-		nieme_turn(150,direction);
+		nieme_turn(200,direction);
 	}
 
 	//returns back to the perpendicular line
 	for(int i=0;i<7;i++) {
 
-		delay(ONE_SEC/5);
-		nieme_turn(150,-direction);
+		delay(ONE_SEC/2);
+		nieme_turn(200,-direction);
 	}
 
 }
@@ -144,6 +143,7 @@ void determine_x_y_axis(void){
 	for(int i=0;i<SIDES;i++){
 		sides[i]=VL53L0X_get_dist_mm();
 		quarter_turns(1,LEFT);
+		delay(ONE_SEC);
 	}
 
 	//addition of both distances to calculate the longueur and largeur
@@ -169,6 +169,12 @@ void placement_corner(void){
 	quarter_turns(1,RIGHT);
 	stop_motor();
 
+}
+void go(void){
+	for(int i=1;i<6;i++){
+		go_from_to(tab_point[i-1].x,tab_point[i-1].y,tab_point[i].x,tab_point[i].y);
+		delay(10*ONE_SEC);
+	}
 }
 
 
@@ -248,7 +254,75 @@ void detection_dun_mur(void){
 
 }
 
+static THD_WORKING_AREA(waCalibration, 256);
+static THD_FUNCTION(Calibration, arg) {
 
+    chRegSetThreadName(__FUNCTION__);
+    (void)arg;
+
+    VL53L0X_start();
+
+    int8_t direction;
+   	uint8_t calibration_check=0;
+   	uint8_t min=0;
+
+   	// approaches the side that the user puts it in front of
+   	while(VL53L0X_get_dist_mm()>100){
+   		go_forward();
+   	}
+   	stop_motor();
+   	bool turn_right=false;
+   	delay(ONE_SEC);
+   	int test_1=VL53L0X_get_dist_mm();
+   	delay(ONE_SEC);
+   	nieme_turn(20,RIGHT);
+   	delay(ONE_SEC);
+   	int test_2=VL53L0X_get_dist_mm();
+   	delay(ONE_SEC);
+   	nieme_turn(20,RIGHT);
+   	delay(ONE_SEC);
+   	int test_3=VL53L0X_get_dist_mm();
+   	delay(ONE_SEC);
+   	turn_right=(test_2<test_3)&&(test_3>test_1);
+   	if(turn_right) {
+   		direction=RIGHT;
+   		nieme_turn(5,LEFT);
+   	}
+   	else{
+   		direction=LEFT;
+//		nieme_turn(5,RIGHT);
+   	}
+
+   	//makes small turns (1/200 turn) and compares the distance it receives with the ones before
+   	//if the distance gets lower and goes higher after then it means it was perpendicular to the side it faces
+   	while(calibration_check<8){
+
+   		delay(ONE_SEC/4);
+   		avg_distance=VL53L0X_get_dist_mm();
+   		delay(ONE_SEC/4);
+
+   		//if distance gets lower it means the perpendicular line is still not obtained
+   		if(avg_distance<distance_min) {
+   			distance_min=avg_distance;
+   			min++;
+   			calibration_check=0;
+   		}
+
+   		//if distance gets higher after it was getting lower for a number of checks then it
+   		//confirms the perpendicular line
+   		if(avg_distance>distance_min && avg_distance<400 && min>2) {
+   			calibration_check++;
+   		}
+ 		nieme_turn(200,direction);
+   	}
+
+   	//returns back to the perpendicular line
+   	for(int i=0;i<7;i++) {
+    	delay(ONE_SEC/2);
+    	nieme_turn(200,-direction);
+    }
+
+}
 
 static THD_WORKING_AREA(waMouvement, 256);
 static THD_FUNCTION(Mouvement, arg) {
@@ -265,7 +339,8 @@ static THD_FUNCTION(Mouvement, arg) {
 				detection_dun_mur();
 			}
 			//on le met perpendiculaire au mur
-			calibration_angle();
+//			calibration_angle();
+			delay(ONE_SEC);
 //			delay(ONE_SEC*20);
 			//chprintf((BaseSequentialStream *)&SD3, "HELLO");
 			//Déterminer axe des y le plus long
@@ -294,9 +369,8 @@ static THD_FUNCTION(Mouvement, arg) {
 }
 
 void start_program(void){
+	chThdCreateStatic(waCalibration, sizeof(waCalibration), NORMALPRIO+1, Calibration, NULL);
 	chThdCreateStatic(waMouvement, sizeof(waMouvement), NORMALPRIO, Mouvement, NULL);
-//	chThdCreateStatic(waMicrophone, sizeof(waMicrophone), NORMALPRIO, Microphone, NULL);
-//	chThdCreateStatic(waMusic, sizeof(waMusic), NORMALPRIO, Music, NULL);
 }
 
 void set_semamvt(void){

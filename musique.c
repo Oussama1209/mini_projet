@@ -58,17 +58,17 @@ static THD_FUNCTION(Music, arg) {
     	chBSemWait(&mvtplay_sem);
 		if(get_tab_point() == TARAUDAGE){
 			LED_Toggle(get_diametre());
-			wait(50000000);
-//			playMelody(MARIO_START, ML_SIMPLE_PLAY, NULL);
-//			waitMelodyHasFinished();
-//			stopCurrentMelody();
+//			wait(50000000);
+			playMelody(MARIO_START, ML_SIMPLE_PLAY, NULL);
+			waitMelodyHasFinished();
+			stopCurrentMelody();
 			LED_Toggle(get_diametre());
 		} else {
 			LED_Toggle(get_diametre());
-			wait(50000000);
-//			playMelody(MARIO_DEATH, ML_SIMPLE_PLAY, NULL);
-//			waitMelodyHasFinished();
-//			stopCurrentMelody();
+//			wait(50000000);
+			playMelody(MARIO_DEATH, ML_SIMPLE_PLAY, NULL);
+			waitMelodyHasFinished();
+			stopCurrentMelody();
 			LED_Toggle(get_diametre());
 		}
 		set_semamicro();

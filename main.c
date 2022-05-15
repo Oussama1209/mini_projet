@@ -23,7 +23,6 @@
 #define WHEEL_DISTANCE      5.35f    //cm
 #define PERIMETER_EPUCK     (PI * WHEEL_DISTANCE)
 
-//static struct Mypoint tab_point[2] = {{40, 40, 2, TARAUDAGE}, {90, 90, 3, PERCAGE}};
 static void serial_start(void)
 {
 	static SerialConfig ser_cfg = {
@@ -65,11 +64,23 @@ int main(void)
     usb_start();
     //init the motors
     motors_init();
-
+//    VL53L0X_start();
+//    calibration_angle();
     start_program();
     start_music();
     start_microphone();
 //    led();
+//    go();
+//    while(VL53L0X_get_dist_mm()>320-100){
+//    	go_forward();
+//    }
+//    stop_motor();
+//    quarter_turns(1,RIGHT);
+//    while(VL53L0X_get_dist_mm()>distance_x-x_f){
+//    	go_forward();
+//    }
+//    quarter_turns(1,LEFT);
+//    stop_motor();
 
 
 //	while (1) {
